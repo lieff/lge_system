@@ -2,7 +2,7 @@ lge system
 ==========
 
 https://github.com/neosmart/pevents project alternative which also includes threads and critical sections.
-Main goal is simplicity and minimal win32 code modification. Primary used for ray-trace Lion Game Engine.
+Main goal is performance, simplicity and minimal win32 code modification. Primary used for ray-trace Lion Game Engine.
 Supported platforms: windows, linux, macos, android, ios.
 
 There some limitations:

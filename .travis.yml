@@ -3,6 +3,22 @@ compiler:
   - gcc
   - clang
 git:
+  submodules: false
+cache: apt
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq cppcheck
+script:
+  - gcc -c src/lge_system.cpp
+branches:
+  only:
+    - master
+after_script: cppcheck --verbose --enable=all --quiet `git ls-files src/\*.cpp`
+language: cpp
+compiler:
+  - gcc
+  - clang
+git:
 submodules: false
 cache: apt
 before_install:
@@ -14,5 +30,8 @@ branches:
 only:
   - master
 after_script: cppcheck --verbose --enable=all --quiet `git ls-files src/\*.cpp`
-on_success: change
-on_failure: always
+notifications:
+  email:
+    recipients:
+    on_success: change
+    on_failure: always

@@ -14,8 +14,5 @@ branches:
 only:
   - master
 after_script: cppcheck --verbose --enable=all --quiet `git ls-files src/\*.cpp`
-notifications:
-email:
-recipients:
 on_success: change
 on_failure: always

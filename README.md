@@ -5,6 +5,9 @@ LGE System is a https://github.com/neosmart/pevents project alternative which al
 Main goal is performance, simplicity and minimal win32 code modification. Primary used for ray-trace Lion Game Engine.
 Supported platforms: windows, linux, macos, android, ios.
 
+
+[![Build Status](http://img.shields.io/travis/lieff/lge_system.svg)](https://travis-ci.org/lieff/lge_system)
+
 There some limitations:
   1. WaitForMultipleObjects cannot be used with overlapped events set at the same time.
   2. WaitForMultipleObjects\WaitForSingleObject can wait only on events, mutexes and threads not supported.

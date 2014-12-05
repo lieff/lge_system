@@ -14,22 +14,6 @@ branches:
   only:
     - master
 after_script: cppcheck --verbose --enable=all --quiet `git ls-files src/\*.cpp`
-language: cpp
-compiler:
-  - gcc
-  - clang
-git:
-submodules: false
-cache: apt
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq cppcheck
-script:
-  - gcc src/lge_system.cpp
-branches:
-only:
-  - master
-after_script: cppcheck --verbose --enable=all --quiet `git ls-files src/\*.cpp`
 notifications:
   email:
     recipients:

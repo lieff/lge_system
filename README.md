@@ -1,7 +1,7 @@
 LGE System
 ==========
 
-https://github.com/neosmart/pevents project alternative which also includes threads and critical sections.
+LGE System is a https://github.com/neosmart/pevents project alternative which also includes threads and critical sections.
 Main goal is performance, simplicity and minimal win32 code modification. Primary used for ray-trace Lion Game Engine.
 Supported platforms: windows, linux, macos, android, ios.
 

@@ -1,3 +1,4 @@
+#pragma once
 #ifndef __LGE_SYSTEM_H__
 #define __LGE_SYSTEM_H__
 
@@ -5,6 +6,8 @@
 
 #include <windows.h>
 typedef DWORD THREAD_RET;
+#define THRAPI __stdcall
+#include <stdint.h>
 
 #else  //_WIN32
 
@@ -16,6 +19,8 @@ typedef THREAD_RET (*PTHREAD_START_ROUTINE)(void *lpThreadParameter);
 typedef PTHREAD_START_ROUTINE LPTHREAD_START_ROUTINE;
 
 typedef pthread_mutex_t CRITICAL_SECTION, *PCRITICAL_SECTION, *LPCRITICAL_SECTION;
+
+#define THRAPI
 
 #ifndef FALSE
 #define FALSE 0
@@ -59,5 +64,7 @@ bool DestroyEvent(HANDLE event);
 bool CloseThread(HANDLE thread);
 bool WaitThread(HANDLE thread);
 bool SetThreadName(const char *name);
+
+uint64_t GetTime();
 
 #endif //__LGE_SYSTEM_H__

@@ -353,11 +353,11 @@ HANDLE CreateThread(void *lpThreadAttributes, uint32_t dwStackSize,
 {
     pthread_t *t = (pthread_t *)malloc(sizeof(*t));
     if (!t)
-        return NULL;
+        return nullptr;
     if (pthread_create(t, 0, lpStartAddress, lpParameter))
     {
         free(t);
-        return NULL;
+        return nullptr;
     }
     if (lpThreadId)
         *lpThreadId = (uint32_t)*t;
@@ -421,7 +421,7 @@ bool DestroyEvent(HANDLE event)
 
 bool CloseThread(HANDLE thread)
 {
-    CloseHandle(event);
+    CloseHandle(thread);
     return true;
 }
 
@@ -456,4 +456,20 @@ bool SetThreadName(const char *name)
 #else // macos, ios
     return (0 == pthread_setname_np(name));
 #endif
+}
+
+uint64_t GetTime()
+{
+    uint64_t time;
+#ifdef _WIN32
+    QueryPerformanceCounter((LARGE_INTEGER*)&time);
+#elif defined(__APPLE__)
+    time = GetAbsTimeInNanoseconds();
+#else
+    timespec ts;
+    // CLOCK_PROCESS_CPUTIME_ID CLOCK_THREAD_CPUTIME_ID
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    time = (uint64_t)ts.tv_sec * 1000000u + ts.tv_nsec / 1000u;
+#endif
+    return time;
 }

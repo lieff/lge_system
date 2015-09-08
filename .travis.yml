@@ -9,7 +9,7 @@ before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq cppcheck
 script:
-  - gcc -c src/lge_system.cpp
+  - gcc -c -std=c++0x src/lge_system.cpp
 branches:
   only:
     - master

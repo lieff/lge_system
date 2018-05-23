@@ -2,12 +2,15 @@
 
 #ifndef _WIN32
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <time.h>
 #include <errno.h>
+#include <unistd.h>
 #if defined(__linux) || defined(__linux__)
 #include <sys/prctl.h>
 #endif
+
+#define nullptr 0
 
 struct Event
 {
@@ -20,7 +23,7 @@ struct Event
 
 static bool InitEvent(Event *e)
 {
-#if defined(ANDROID) || defined(__APPLE__)
+#if (defined(ANDROID) && !defined(__LP64__)) || defined(__APPLE__)
     if (pthread_cond_init(&e->cond, NULL))
         return false;
 #else
@@ -79,7 +82,7 @@ static inline void GetAbsTime(timespec *ts, uint32_t timeout)
 
 static inline int CondTimedWait(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime)
 {
-#if defined(ANDROID)
+#if defined(ANDROID) && !defined(__LP64__)
     return pthread_cond_timedwait_monotonic_np(cond, mutex, abstime);
 #elif defined(__APPLE__)
     timespec reltime;
@@ -104,7 +107,7 @@ static bool WaitForEvent(Event *e, uint32_t timeout, bool *signaled)
     if (pthread_mutex_lock(&e->mutex))
         return false;
 
-    if (timeout == INFINITE)
+    if (timeout == (uint32_t)INFINITE)
     {
         while (!e->signaled)
             pthread_cond_wait(&e->cond, &e->mutex);
@@ -165,7 +168,7 @@ static bool WaitForMultipleEvents(Event **e, uint32_t count, uint32_t timeout, b
         }
         CHECK_SIGNALED;
     } else
-    if (timeout == INFINITE)
+    if (timeout == (uint32_t)INFINITE)
     {
 #define SET_MULTIPLE(val) for (i = 1; i < count; i++)\
             e[i]->pMultipleCond = val;
@@ -210,19 +213,17 @@ static bool SignalEvent(Event *e)
 
     Event *pMultipleCond = e->pMultipleCond;
     e->signaled = true;
-    if (pthread_cond_signal(&e->cond))
-        return false;
+    int res = pthread_cond_signal(&e->cond);
 
-    if (pthread_mutex_unlock(&e->mutex))
+    if (pthread_mutex_unlock(&e->mutex) || res)
         return false;
 
     if (pMultipleCond && pMultipleCond != e)
     {
         if (pthread_mutex_lock(&pMultipleCond->mutex))
             return false;
-        if (pthread_cond_signal(&pMultipleCond->cond))
-            return false;
-        if (pthread_mutex_unlock(&pMultipleCond->mutex))
+        res = pthread_cond_signal(&pMultipleCond->cond);
+        if (pthread_mutex_unlock(&pMultipleCond->mutex) || res)
             return false;
     }
     return true;
@@ -238,7 +239,7 @@ static bool ResetEvent(Event *e)
     return true;
 }
 
-HANDLE CreateEvent(void *pSecAttr, bool manualReset, bool initialState, void *pName)
+HANDLE event_create(bool manualReset, bool initialState)
 {
     Event *e = (Event *)malloc(sizeof(*e));
     if (!e)
@@ -253,7 +254,7 @@ HANDLE CreateEvent(void *pSecAttr, bool manualReset, bool initialState, void *pN
     return (HANDLE)e;
 }
 
-bool DestroyEvent(HANDLE event)
+bool event_destroy(HANDLE event)
 {
     Event *e = (Event *)event;
     if (!e)
@@ -266,17 +267,17 @@ bool DestroyEvent(HANDLE event)
     return true;
 }
 
-bool SetEvent(HANDLE event)
+bool event_set(HANDLE event)
 {
     return SignalEvent((Event *)event);
 }
 
-bool ResetEvent(HANDLE event)
+bool event_reset(HANDLE event)
 {
     return ResetEvent((Event *)event);
 }
 
-int WaitForSingleObject(HANDLE event, uint32_t milliseconds)
+int event_wait(HANDLE event, uint32_t milliseconds)
 {
     bool signaled;
     if (!WaitForEvent((Event *)event, milliseconds, &signaled))
@@ -284,26 +285,15 @@ int WaitForSingleObject(HANDLE event, uint32_t milliseconds)
     return signaled ? WAIT_OBJECT : WAIT_TIMEOUT;
 }
 
-int WaitForSingleObjectEx(HANDLE event, uint32_t milliseconds, bool bAlertable)
-{
-    return WaitForSingleObject(event, milliseconds);
-}
-
-int WaitForMultipleObjects(uint32_t count, const HANDLE *events, bool waitAll, uint32_t milliseconds)
+int event_wait_multiple(uint32_t count, const HANDLE *events, bool waitAll, uint32_t milliseconds)
 {
     if (count == 1)
-        return WaitForSingleObject(events[0], milliseconds);
+        return event_wait(events[0], milliseconds);
     int signaled_num = -1;
     if (!WaitForMultipleEvents((Event **)events, count, milliseconds, waitAll, &signaled_num))
         return WAIT_FAILED;
     return (signaled_num < 0) ? WAIT_TIMEOUT : (WAIT_OBJECT_0 + signaled_num);
 }
-
-int WaitForMultipleObjectsEx(uint32_t count, const HANDLE *events, bool waitAll, uint32_t milliseconds, bool bAlertable)
-{
-    return WaitForMultipleObjects(count, events, waitAll, milliseconds);
-}
-
 
 bool InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
 {
@@ -346,10 +336,7 @@ bool LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
     return true;
 }
 
-
-HANDLE CreateThread(void *lpThreadAttributes, uint32_t dwStackSize,
-    LPTHREAD_START_ROUTINE lpStartAddress, void *lpParameter,
-    uint32_t dwCreationFlags, uint32_t *lpThreadId)
+HANDLE thread_create(LPTHREAD_START_ROUTINE lpStartAddress, void *lpParameter)
 {
     pthread_t *t = (pthread_t *)malloc(sizeof(*t));
     if (!t)
@@ -359,12 +346,12 @@ HANDLE CreateThread(void *lpThreadAttributes, uint32_t dwStackSize,
         free(t);
         return nullptr;
     }
-    if (lpThreadId)
-        *lpThreadId = (uint32_t)*t;
+    //if (lpThreadId)
+    //    *lpThreadId = (uint32_t)*t;
     return (HANDLE)t;
 }
 
-bool CloseThread(HANDLE thread)
+bool thread_close(HANDLE thread)
 {
     if (!thread)
         return false;
@@ -375,17 +362,17 @@ bool CloseThread(HANDLE thread)
     return true;
 }
 
-bool WaitThread(HANDLE thread)
+void *thread_wait(HANDLE thread)
 {
     if (!thread)
-        return false;
-    void *ret;
+        return (void*)-1;
+    void *ret = 0;
     pthread_t *t = (pthread_t *)thread;
     if (!*t)
-        return true;
+        return ret;
     int res = pthread_join(*t, &ret);
     if (res)
-        return false;
+        return (void*)-1;
 #if 0
     if (timeout == 0)
     {
@@ -408,33 +395,46 @@ bool WaitThread(HANDLE thread)
     }
 #endif
     *t = 0; // thread joined - no need to detach
-    return true;
+    return ret;
 }
 
 #else  //_WIN32
 
-bool DestroyEvent(HANDLE event)
+HANDLE thread_create(LPTHREAD_START_ROUTINE lpStartAddress, void *lpParameter)
+{
+    DWORD tid;
+    return CreateThread(0, 0, lpStartAddress, lpParameter, 0, &tid);
+}
+
+bool event_destroy(HANDLE event)
 {
     CloseHandle(event);
     return true;
 }
 
-bool CloseThread(HANDLE thread)
+bool thread_close(HANDLE thread)
 {
     CloseHandle(thread);
     return true;
 }
 
-bool WaitThread(HANDLE thread)
+void *thread_wait(HANDLE thread)
 {
-    return WaitForSingleObject(thread, INFINITE) == WAIT_OBJECT_0;
+    if (WaitForSingleObject(thread, INFINITE) == WAIT_OBJECT_0)
+    {
+        DWORD ExitCode;
+        GetExitCodeThread(thread, &ExitCode);
+        return (void *)(intptr_t)ExitCode;
+    }
+    return (void *)(intptr_t)-1;
 }
 
 #endif //_WIN32
 
-bool SetThreadName(const char *name)
+bool thread_name(const char *name)
 {
 #ifdef _WIN32
+#ifdef _MSC_VER
     struct tagTHREADNAME_INFO
     {
         DWORD dwType;
@@ -449,6 +449,7 @@ bool SetThreadName(const char *name)
     __except(EXCEPTION_EXECUTE_HANDLER)
     {
     }
+#endif
     return true;
 #elif defined(__linux) || defined(__linux__)
     return (0 == prctl(PR_SET_NAME, name, 0, 0, 0));
@@ -458,13 +459,23 @@ bool SetThreadName(const char *name)
 #endif
 }
 
+void thread_sleep(uint32_t milliseconds)
+{
+#ifdef _WIN32
+    Sleep(milliseconds);
+#else
+    usleep((useconds_t)milliseconds*1000);
+#endif
+}
+
 uint64_t GetTime()
 {
     uint64_t time;
 #ifdef _WIN32
-    QueryPerformanceCounter((LARGE_INTEGER*)&time);
+    GetSystemTimeAsFileTime((FILETIME*)&time);
+    time = time/10 - 11644473600000000;
 #elif defined(__APPLE__)
-    time = GetAbsTimeInNanoseconds();
+    time = GetAbsTimeInNanoseconds() / 1000u;
 #else
     timespec ts;
     // CLOCK_PROCESS_CPUTIME_ID CLOCK_THREAD_CPUTIME_ID
